@@ -249,6 +249,7 @@ class ReferTreeProvider {
 		if (element.type == "head") {
 			return {
 				label: element.content,
+				iconPath: new vscode.ThemeIcon("list-selection")
 			}
 
 		} else if (element.type == "file") {
@@ -256,13 +257,13 @@ class ReferTreeProvider {
 				label: element.content,
 				tooltip: 'File',
 				// collapsibleState: collapsible,
-				iconPath: vscode.ThemeIcon.Folder,
+				iconPath: vscode.ThemeIcon.File,
 			}
 
 		} else {
 			var icon = null
 			if (showIdx == element.idx) {
-				icon = vscode.ThemeIcon.File	
+				icon = new vscode.ThemeIcon("pinned")	
 			}
 
 			return {
