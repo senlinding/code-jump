@@ -1,5 +1,6 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+/*
+	1. 对于vscode刚起来时，出现reference不显示结果(next会刷出来)。估计是vscode刚起来扩展系统还没有初始化好。vscode刚起来时，转到定义有时也无效(转到定义OK时，reference没有出现过问题)
+*/
 const vscode = require('vscode');
 const cp = require('child_process');
 
