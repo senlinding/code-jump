@@ -1,0 +1,77 @@
+{
+	"name": "code-jump",
+	"displayName": "code-jump",
+	"description": "",
+	"version": "1.1.11",
+	"icon": "image/logo.png",
+	"engines": {
+		"vscode": "^1.38.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+		"onCommand:extension.jumpReference",
+		"onCommand:extension.jumpNextReference",
+		"onCommand:extension.jumpPrevReference",
+		"onView:targetReference",
+		"onCommand:itemClick"
+	],
+	"main": "./extension.js",
+	"contributes": {
+		"commands": [{
+            "command": "extension.jumpReference",
+			"title": "jump reference"
+		},{
+            "command": "extension.jumpNextReference",
+			"title": "jump next reference"
+		},{
+            "command": "extension.jumpPrevReference",
+			"title": "jump prev reference"
+		}],
+
+		"configuration": {
+			"type": "object",
+			"properties": {
+				"code jump.rgPath":{
+					"type": "string",
+					"default": "rg",
+					"description": "ripgrep path"
+				}
+			}
+		},
+
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "show-reference",
+					"title": "Code Reference",
+					"icon": "image/ref.svg"
+				}
+			]
+		},
+		"views": {
+			"show-reference": [
+				{
+					"id": "targetReference",
+					"name": "info"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"test": "node ./test/runTest.js"
+	},
+	"devDependencies": {
+		"@types/glob": "^7.1.1",
+		"@types/mocha": "^5.2.6",
+		"@types/node": "^10.12.21",
+		"@types/vscode": "^1.38.0",
+		"eslint": "^5.13.0",
+		"glob": "^7.1.4",
+		"mocha": "^6.1.4",
+		"typescript": "^3.3.1",
+		"vscode-test": "^1.2.0"
+	},
+	"publisher": "senlin"
+}
