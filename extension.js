@@ -162,7 +162,8 @@ function parseResult(text){
 		}
 
 		//去除注释 //  /*
-		if (line_text.indexOf("//") == 0 || line_text.indexOf("/*") == 0) {
+		if (line_text.indexOf("//") == 0 || line_text.indexOf("/*") == 0 ||
+		 	line_text.indexOf("--") == 0) {
 			continue
 		}
 
@@ -261,7 +262,7 @@ class ReferTreeProvider {
 		} else {
 			var icon = null
 			if (showIdx == element.idx) {
-				icon = vscode.ThemeIcon.File	//更改了class ThemeIcon的constructor(id: string)为非私有函数
+				icon = vscode.ThemeIcon.File	
 			}
 
 			return {

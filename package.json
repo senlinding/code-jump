@@ -2,7 +2,7 @@
 	"name": "code-jump",
 	"displayName": "code-jump",
 	"description": "",
-	"version": "1.1.11",
+	"version": "1.1.12",
 	"icon": "image/logo.png",
 	"engines": {
 		"vscode": "^1.38.0"
