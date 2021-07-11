@@ -35,5 +35,6 @@ Support lua
 ### 1.1.7
 Integrate linux ripgrep-12.1.1-x86_64 by default
 
-### 1.1.9
-Support selection
+### 1.2.1
+1. Support click to select result
+2. Add icon to the result
