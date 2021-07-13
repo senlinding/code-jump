@@ -79,7 +79,7 @@ function getRgResult(word){
 		rg = ext_path + "/res/rg"
 	}
 
-	const cmd = 'timeout 3 ' + rg + ' -w -s --json -t cpp -t c -t lua ' + word
+	const cmd = 'timeout 3 ' + rg + ' -w -s --json -t cpp -t c -t lua -t js -t py ' + word
 
 	cp.exec(cmd, {
 		cwd: vscode.workspace.rootPath
@@ -108,7 +108,43 @@ function checkFileName(file_name){
 	return true
 }
 
-function checkCode(code){
+function checkLuaCode(code, file_name){
+	var str = code.replace(/\s+/g, "")
+	var idx = str.indexOf(keyword)
+	if (idx < 0) {
+		return false
+	}
+
+	if (file_name.indexOf(".lua") > -1) {
+		if (str.indexOf("--") == 0) {
+			return false
+		}
+	
+		//去除lua中的key=function()
+		if (str.indexOf(keyword + "=function(") > 0 || str.indexOf("function") == 0 ||
+			str.indexOf("local function") == 0) {
+			return false
+		}
+	}
+
+	return true
+}
+
+//获取某个字符的个数
+function get_char_num(str, char){
+	var i = 0
+	var num = 0
+
+	for (i = 0; i < str.length; i++) {
+		if (str[i] == char) {
+			num ++
+		}
+	}
+
+	return num;
+}
+
+function checkCode(code, file_name){
 	var prev_str = ""
 	var str = code.replace(/\s+/g, "")
 	var idx = str.indexOf(keyword)
@@ -116,17 +152,36 @@ function checkCode(code){
 		return false
 	}
 
+	//去除注释 //  /*
+	if (str.indexOf("//") == 0 || str.indexOf("/*") == 0) {
+		return false
+	}
+
+	if (str.indexOf("#define") == 0 && idx > "#define".length) {
+		return true
+	}
+
+	if (!checkFileName(file_name)) {
+		return false
+	}
+
+	if (!checkLuaCode(code, file_name)) {
+		return false
+	}
+
+	//过滤printf("test_func call error")
+	if (idx > 1) {	//
+		if (get_char_num(str.slice(0, idx), '\"') % 2 == 1 || 
+			get_char_num(str.slice(0, idx), "\'") % 2 == 1)
+		return false
+	}
+
 	if (idx == 0 || str.indexOf("return") == 0) {
 		return true
 	}
 
-	prev_str = str.slice(0, idx)
-	if (prev_str.indexOf("\"") > 0) {
-		return false	//log code
-	}
-
 	prev_str = str.slice(idx - 1, idx)
-	var isletter = /^[a-zA-Z]+$/.test(prev_str)
+	var isletter = /^[a-zA-Z]+$/.test(prev_str)	//匹配项关键key前不能是字母
 	if(!isletter){
 		return true
 	}
@@ -156,26 +211,14 @@ function parseResult(text){
 			continue
 		}
 
-		var line_text = result_obj.data.lines.text.replace(/\s+/g, "")
-		//去除lua中的key=function()
-		if (line_text.indexOf(keyword + "=function(") > 0) {
-			continue
-		}
-
-		//去除注释 //  /*
-		if (line_text.indexOf("//") == 0 || line_text.indexOf("/*") == 0 ||
-		 	line_text.indexOf("--") == 0) {
-			continue
-		}
-
 		var file = result_obj.data.path.text
 		var code = result_obj.data.lines.text
 		var file_pos = file.lastIndexOf('/')
 		var path = file.substring(0, file_pos)
 		var file_name = file.substring(file_pos + 1, )
 
-		if (checkFileName(file_name) && result_obj.data.submatches.length > 0) {
-			if (checkCode(code)) {
+		if (result_obj.data.submatches.length > 0) {
+			if (checkCode(code, file_name)) {
 				result.push({
 					"file": file,
 					"path": path,
