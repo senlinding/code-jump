@@ -21,20 +21,20 @@
 	"contributes": {
 		"commands": [{
             "command": "extension.jumpReference",
-			"title": "jump reference"
+			"title": "%cmd.jumpReference%"
 		},{
             "command": "extension.jumpNextReference",
-			"title": "jump next reference"
+			"title": "%cmd.jumpNextReference%"
 		},{
             "command": "extension.jumpPrevReference",
-			"title": "jump prev reference"
+			"title": "%cmd.jumpPrevReference%"
 		},{
             "command": "extension.expandAllReference",
-			"title": "全部展开",
+			"title": "%cmd.expandAll%",
 			"icon": "$(expand-all)"
 		},{
             "command": "extension.collapseAllReference",
-			"title": "全部折叠",
+			"title": "%cmd.collapseAll%",
 			"icon": "$(collapse-all)"
 		}],
 
@@ -59,7 +59,7 @@
 				"code jump.rgPath":{
 					"type": "string",
 					"default": "rg",
-					"description": "ripgrep path"
+					"description": "%config.rgPath.desc%"
 				}
 			}
 		},
@@ -68,7 +68,7 @@
 			"activitybar": [
 				{
 					"id": "show-reference",
-					"title": "Code Reference",
+					"title": "%viewContainer.title%",
 					"icon": "image/ref.svg"
 				}
 			]
@@ -77,14 +77,14 @@
 			"show-reference": [
 				{
 					"id": "targetReference",
-					"name": "info"
+					"name": ""
 				}
 			]
 		},
 		"viewsWelcome": [
 			{
 				"view": "targetReference",
-				"contents": "暂无引用结果。\n将光标放在某个符号上，执行 jump reference 命令以查找引用。"
+				"contents": "%view.welcome%"
 			}
 		]
 	},

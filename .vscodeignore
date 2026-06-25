@@ -1,0 +1,9 @@
+.claude/**
+.git/**
+node_modules/**
+test/**
+npm-debug.log
+*.vsix
+vsc-extension-quickstart.md
+jsconfig.json
+.vscodeignore

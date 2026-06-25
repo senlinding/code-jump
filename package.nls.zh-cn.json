@@ -1,0 +1,10 @@
+{
+	"cmd.jumpReference": "查找引用",
+	"cmd.jumpNextReference": "下一个引用",
+	"cmd.jumpPrevReference": "上一个引用",
+	"cmd.expandAll": "全部展开",
+	"cmd.collapseAll": "全部折叠",
+	"config.rgPath.desc": "ripgrep 路径",
+	"viewContainer.title": "代码引用",
+	"view.welcome": "暂无引用结果。\n将光标放在某个符号上，执行 查找引用 命令以查找引用。"
+}

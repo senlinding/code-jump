@@ -1,0 +1,10 @@
+{
+	"cmd.jumpReference": "Jump Reference",
+	"cmd.jumpNextReference": "Jump Next Reference",
+	"cmd.jumpPrevReference": "Jump Prev Reference",
+	"cmd.expandAll": "Expand All",
+	"cmd.collapseAll": "Collapse All",
+	"config.rgPath.desc": "ripgrep path",
+	"viewContainer.title": "Code Reference",
+	"view.welcome": "No references yet.\nPlace the cursor on a symbol and run the Jump Reference command to find references."
+}

@@ -4,6 +4,26 @@
 const vscode = require('vscode');
 const cp = require('child_process');
 
+// 运行时文案的轻量国际化：只支持中文、英文。
+// engines 为 ^1.38.0，vscode.l10n（1.73+）不一定存在，故按 env.language 自行选择中英两套文案。
+// vscode.env.language 形如 "zh-cn" / "en" / "en-us"，以 zh 开头视为中文，其余回退英文。
+var isZh = String((vscode.env && vscode.env.language) || "en").toLowerCase().indexOf("zh") == 0
+var nls = {
+	en: {
+		status: function () { return "reference: " },
+		summary: function (fileCount, num) { return num + " results in " + fileCount + " files" },
+		noResult: function () { return "No results found" },
+		refTooltip: function (n) { return n + " references" }
+	},
+	zh: {
+		status: function () { return "引用: " },
+		summary: function (fileCount, num) { return fileCount + " 个文件中有 " + num + " 个结果" },
+		noResult: function () { return "未找到结果" },
+		refTooltip: function (n) { return n + " 处引用" }
+	}
+}
+var L = isZh ? nls.zh : nls.en
+
 const showBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
 
 var keyword = ""
@@ -32,7 +52,7 @@ function getReferResultStr() {
 }
 
 function showStatus() {
-    showBar.text = "reference: " + getReferResultStr();
+    showBar.text = L.status() + getReferResultStr();
     // 状态栏文字保持默认颜色（不覆盖 color）
     showBar.color = undefined;
     showBar.show();
@@ -344,8 +364,8 @@ class ReferTreeProvider {
 
 		// head 文案改为搜索框样式的汇总。
 		headNode.content = (referNum > 0)
-			? (fileCount + " 个文件中有 " + referNum + " 个结果")
-			: "未找到结果"
+			? L.summary(fileCount, referNum)
+			: L.noResult()
 
 		// 新搜索默认全部展开：重置折叠状态与按钮图标。
 		this.fileCount = fileCount
@@ -509,7 +529,7 @@ function activate(context) {
 				return {
 					// 徽标最多 2 个字符，>99 显示 99，精确值见 tooltip。
 					badge: n > 99 ? "99" : String(n),
-					tooltip: n + " 处引用"
+					tooltip: L.refTooltip(n)
 				}
 			}
 		})
