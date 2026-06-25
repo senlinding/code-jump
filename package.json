@@ -2,7 +2,7 @@
 	"name": "code-jump",
 	"displayName": "code-jump",
 	"description": "",
-	"version": "1.2.6",
+	"version": "1.2.8",
 	"icon": "image/logo.png",
 	"engines": {
 		"vscode": "^1.38.0"
@@ -28,7 +28,30 @@
 		},{
             "command": "extension.jumpPrevReference",
 			"title": "jump prev reference"
+		},{
+            "command": "extension.expandAllReference",
+			"title": "全部展开",
+			"icon": "$(expand-all)"
+		},{
+            "command": "extension.collapseAllReference",
+			"title": "全部折叠",
+			"icon": "$(collapse-all)"
 		}],
+
+		"menus": {
+			"view/title": [
+				{
+					"command": "extension.collapseAllReference",
+					"when": "view == targetReference && !codeJump.allCollapsed",
+					"group": "navigation@1"
+				},
+				{
+					"command": "extension.expandAllReference",
+					"when": "view == targetReference && codeJump.allCollapsed",
+					"group": "navigation@1"
+				}
+			]
+		},
 
 		"configuration": {
 			"type": "object",
@@ -57,7 +80,13 @@
 					"name": "info"
 				}
 			]
-		}
+		},
+		"viewsWelcome": [
+			{
+				"view": "targetReference",
+				"contents": "暂无引用结果。\n将光标放在某个符号上，执行 jump reference 命令以查找引用。"
+			}
+		]
 	},
 	"scripts": {
 		"test": "node ./test/runTest.js"

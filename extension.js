@@ -11,6 +11,9 @@ var referResult = null
 var referNum = 0
 var showIdx = 0
 var referProvider = null
+var treeView = null
+var decoEmitter = null
+var REF_DECO_SCHEME = "code-jump-ref"		// 承载行尾引用数徽标的自定义 URI scheme
 var myExtensionName = "senlin.code-jump"
 
 function setRefer(refer, idx) {
@@ -30,7 +33,8 @@ function getReferResultStr() {
 
 function showStatus() {
     showBar.text = "reference: " + getReferResultStr();
-    showBar.color = 'yellow';
+    // 状态栏文字保持默认颜色（不覆盖 color）
+    showBar.color = undefined;
     showBar.show();
 }
 
@@ -56,8 +60,18 @@ function getCursorWord() {
 	return document.getText(needleRange)
 }
 
+// 获取工作区根路径。新版 vscode 中 workspace.rootPath 已废弃，
+// 优先使用 workspaceFolders，兼容无工作区/多根场景。
+function getRootPath() {
+	const folders = vscode.workspace.workspaceFolders
+	if (folders && folders.length > 0) {
+		return folders[0].uri.fsPath
+	}
+	return vscode.workspace.rootPath || ""
+}
+
 function realJump(result) {
-	var file = vscode.workspace.rootPath + '/' + result.file
+	var file = getRootPath() + '/' + result.file
 	const options = {
 		// 选中第3行第9列到第3行第17列, vscode 行索引可能从0开始
 		selection: new vscode.Range(new vscode.Position(result.line - 1, result.start), 
@@ -82,7 +96,7 @@ function getRgResult(word){
 	const cmd = 'timeout 3 ' + rg + ' -w -s --json -t cpp -t c -t lua -t js -t py ' + word
 
 	cp.exec(cmd, {
-		cwd: vscode.workspace.rootPath
+		cwd: getRootPath()
 	}, (err, stdout, stderr) => {
 		if (err) {
 			console.log('error: ' + err);
@@ -241,85 +255,220 @@ class ReferTreeProvider {
 		this.showResult = null;
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
+		this.fileCount = 0;
+		this.collapsedFiles = new Set();		// 记录已折叠的文件，用于切换展开/折叠按钮图标
+	}
+
+	// 根据折叠状态切换标题栏按钮图标（全部折叠时显示“全部展开”）。
+	updateCollapseContext() {
+		var all = this.fileCount > 0 && this.collapsedFiles.size >= this.fileCount
+		vscode.commands.executeCommand('setContext', 'codeJump.allCollapsed', !!all)
+	}
+
+	noteCollapse(element) {
+		if (element && element.type == "file") {
+			this.collapsedFiles.add(element.file)
+			this.updateCollapseContext()
+		}
+	}
+
+	noteExpand(element) {
+		if (element && element.type == "file") {
+			this.collapsedFiles.delete(element.file)
+			this.updateCollapseContext()
+		}
+	}
+
+	expandAll() {
+		if (!treeView || !this.showResult) {
+			return
+		}
+		var i
+		for (i in this.showResult) {
+			var node = this.showResult[i]
+			if (node.type == "file") {
+				treeView.reveal(node, { expand: true, select: false, focus: false })
+			}
+		}
+	}
+
+	collapseAll() {
+		vscode.commands.executeCommand("workbench.actions.treeView.targetReference.collapseAll")
 	}
 	
-    refresh() {		
-		var result = new Array()
-		result.push({
+    refresh() {
+		// 构造树形结构：顶层为 head + 各文件节点，文件节点的 children 为该文件下的引用行。
+		var roots = new Array()
+		var codeByIdx = {}
+		var headNode = {
 			"type": "head",
-			"content": "result:" + getReferResultStr()
-		})
-		
+			"content": ""
+		}
+		roots.push(headNode)
+
+		var fileCount = 0
 		if (referNum > 0) {
-			var prevFile = ""
+			// 按文件聚合（不依赖 rg 输出顺序），保证每个文件只有一个节点、计数准确。
+			var fileMap = {}
 			var idx
 			for (idx in referResult) {
-				if (prevFile != referResult[idx].file) {
-					var nameIdx = referResult[idx].file.lastIndexOf("/")
-					result.push({
+				var r = referResult[idx]
+				var nIdx = Number(idx)
+				var fileNode = fileMap[r.file]
+				if (!fileNode) {
+					var nameIdx = r.file.lastIndexOf("/")
+					fileNode = {
 						"type": "file",
-						"content": referResult[idx].file.substr(nameIdx + 1),
-						"idx": idx
-					})
-					prevFile = referResult[idx].file
+						"content": r.file.substr(nameIdx + 1),
+						"file": r.file,
+						"idx": nIdx,			// 该文件首个引用，用于点击跳转
+						"children": new Array()
+					}
+					fileMap[r.file] = fileNode
+					roots.push(fileNode)
+					fileCount++
 				}
-				
-				result.push({
+
+				var codeNode = {
 					"type": "code",
-					"content": referResult[idx].code.trim(),
-					"idx": idx
-				})
+					"content": r.code.trim(),
+					"file": r.file,
+					"line": r.line,
+					"idx": nIdx,
+					"parent": fileNode		// 供 getParent / reveal 使用
+				}
+				fileNode.children.push(codeNode)
+				codeByIdx[nIdx] = codeNode
 			}
 		}
 
-		this.showResult = result
+		// head 文案改为搜索框样式的汇总。
+		headNode.content = (referNum > 0)
+			? (fileCount + " 个文件中有 " + referNum + " 个结果")
+			: "未找到结果"
+
+		// 新搜索默认全部展开：重置折叠状态与按钮图标。
+		this.fileCount = fileCount
+		this.collapsedFiles = new Set()
+		this.updateCollapseContext()
+
+		this.showResult = roots
+		this.codeByIdx = codeByIdx
 		this._onDidChangeTreeData.fire()
-		
-		vscode.commands.executeCommand("workbench.view.extension.show-reference")
-	}
-	
-    getChildren (element) {
-		if (element) {
-			return null;
+
+		// 通知行尾徽标重新计算。
+		if (decoEmitter) {
+			decoEmitter.fire()
 		}
 
-		//return ['first', 'second', 'third'];
-		return this.showResult
+		// 选中并滚动到当前引用（focus:false 不抢编辑器焦点）。
+		this.revealCurrent()
+	}
+
+	// 把当前引用滚动到可见并选中（next/prev/跳转后自动定位）。
+	revealCurrent() {
+		if (referNum <= 0 || !treeView || !this.codeByIdx) {
+			return
+		}
+		var node = this.codeByIdx[showIdx]
+		if (node) {
+			// select:true 让当前行进入选中态，获得与搜索面板结果一致的选中背景高亮；
+			// focus:false 不抢编辑器焦点（呈现“非激活选中”背景，正是搜索结果被打开后的样子）。
+			treeView.reveal(node, { select: true, focus: false })
+		}
+	}
+
+	// 导航/点击时只更新「旧当前项」「新当前项」两个节点（不重建整棵树）。
+	// 整树重建会替换所有节点对象，导致 reveal 的选中与异步渲染抢跑、背景不跟随；
+	// 这里保持节点对象稳定，仅 targeted 刷新移动图钉，再 reveal 移动选中背景。
+	markCurrent(prevIdx) {
+		if (referNum <= 0 || !this.codeByIdx) {
+			return
+		}
+		var prevNode = this.codeByIdx[prevIdx]
+		if (prevNode && prevIdx != showIdx) {
+			this._onDidChangeTreeData.fire(prevNode)	// 去掉旧项图钉
+		}
+		var node = this.codeByIdx[showIdx]
+		if (node) {
+			this._onDidChangeTreeData.fire(node)		// 给新项加图钉
+			if (treeView) {
+				treeView.reveal(node, { select: true, focus: false })
+			}
+		}
+	}
+
+    getChildren (element) {
+		if (!element) {
+			return this.showResult
+		}
+		if (element.type == "file") {
+			return element.children
+		}
+		return null
+	}
+
+	getParent (element) {
+		// reveal() 需要 getParent 才能定位元素。
+		if (element && element.type == "code") {
+			return element.parent
+		}
+		return null
 	}
 
 	getTreeItem (element) {
 		// return null
 
+		// 新版 vscode 要求 label 必须是字符串/TreeItemLabel，做一次兜底防止非法 tree item。
+		var label = (element.content == null) ? "" : String(element.content)
+
 		if (element.type == "head") {
 			return {
-				label: element.content,
+				label: label,
 				iconPath: new vscode.ThemeIcon("list-selection")
 			}
 
 		} else if (element.type == "file") {
 			return {
-				label: element.content,
-				tooltip: 'File',
-				// collapsibleState: collapsible,
+				label: label,
+				// 引用个数通过 FileDecorationProvider 以徽标形式显示在行尾。
+				// 用自定义 scheme，避免 file: 资源带来的问题/Git 徽标。
+				resourceUri: vscode.Uri.from({
+					scheme: REF_DECO_SCHEME,
+					path: '/' + element.file,
+					query: String(element.children.length)
+				}),
 				iconPath: vscode.ThemeIcon.File,
+				// 作为可折叠父节点，默认展开。
+				collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
+				// 点击文件行跳到该文件的首个引用。
+				command: {
+					"title": "itemClick",
+					"command": "itemClick",
+					arguments: [{"idx": element.idx}]
+				}
 			}
 
 		} else {
-			var icon = null
-			if (showIdx == element.idx) {
-				icon = new vscode.ThemeIcon("pinned")	
-			}
-
-			return {
-				label: element.content,
+			var item = {
+				label: label,
 				tooltip: "",
 				command: {
 					"title": "itemClick",
 					"command": "itemClick",
 					arguments: [{"idx": element.idx}]
-				},
-				iconPath: icon
+				}
 			}
+
+			// icon 为空时不要设置 iconPath（保持 undefined）。
+			// 新版 vscode 校验 getTreeItem 返回值时，iconPath: null 会被判为 invalid tree item。
+			if (showIdx == element.idx) {
+				// 当前项用图钉形状标识；颜色保持默认（选中背景已表达当前项，
+				// 且选中前景色会盖掉图标自定义色，故不再着色）。
+				item.iconPath = new vscode.ThemeIcon("pinned")
+			}
+
+			return item
 		}
 	};
 }
@@ -328,19 +477,59 @@ function activate(context) {
 	console.log('Congratulations, your extension "code-jump" is now active!')
 
 	referProvider = new ReferTreeProvider()
-	vscode.window.registerTreeDataProvider("targetReference", referProvider)
+	// 用 createTreeView 以获得 TreeView 句柄（reveal 自动定位需要）。
+	treeView = vscode.window.createTreeView("targetReference", {
+		treeDataProvider: referProvider
+	})
+	context.subscriptions.push(treeView)
+
+	// 跟踪手动折叠/展开，保持标题栏按钮图标与实际状态一致。
+	treeView.onDidCollapseElement(function (e) { referProvider.noteCollapse(e.element) })
+	treeView.onDidExpandElement(function (e) { referProvider.noteExpand(e.element) })
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('extension.expandAllReference', function () {
+			referProvider.expandAll()
+		}))
+	context.subscriptions.push(
+		vscode.commands.registerCommand('extension.collapseAllReference', function () {
+			referProvider.collapseAll()
+		}))
+
+	// 行尾引用数徽标：自定义 scheme 的资源由本 provider 决定徽标内容。
+	decoEmitter = new vscode.EventEmitter()
+	context.subscriptions.push(
+		vscode.window.registerFileDecorationProvider({
+			onDidChangeFileDecorations: decoEmitter.event,
+			provideFileDecoration: function (uri) {
+				if (uri.scheme != REF_DECO_SCHEME) {
+					return undefined
+				}
+				var n = parseInt(uri.query, 10) || 0
+				return {
+					// 徽标最多 2 个字符，>99 显示 99，精确值见 tooltip。
+					badge: n > 99 ? "99" : String(n),
+					tooltip: n + " 处引用"
+				}
+			}
+		})
+	)
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('itemClick', function(item){
 			var idx = parseInt(item.idx)
+			var prevIdx = showIdx
 			setRefer(referNum, idx)
 			realJump(referResult[idx])
+			referProvider.markCurrent(prevIdx)		// 图钉 + 选中背景跟随点击
 		}));
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('extension.jumpReference', function () {
 			setRefer(0, 0)				//need delete when test
 			referProvider.refresh()
+			// 仅在用户主动触发查找时弹出/聚焦引用面板（next/prev/点击不再抢焦点）。
+			vscode.commands.executeCommand("workbench.view.extension.show-reference")
 			keyword = getCursorWord()
 			//vscode.window.showInformationMessage(keyword)
 			getRgResult(keyword)		//need delete when test
@@ -350,10 +539,11 @@ function activate(context) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand('extension.jumpNextReference', function () {
 			if (referNum > 0) {
+				var prevIdx = showIdx
 				var idx = (showIdx + 1) % referNum
 				setRefer(referNum, idx)
 				realJump(referResult[idx])
-				referProvider.refresh()
+				referProvider.markCurrent(prevIdx)
 				// vscode.commands.executeCommand("itemClick", {"idx": idx})
 			}
 		})
@@ -362,10 +552,11 @@ function activate(context) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand('extension.jumpPrevReference', function () {
 			if (referNum > 0) {
+				var prevIdx = showIdx
 				var idx = (showIdx + referNum - 1) % referNum
 				setRefer(referNum, idx)
 				realJump(referResult[idx])
-				referProvider.refresh()
+				referProvider.markCurrent(prevIdx)
 				// vscode.commands.executeCommand("itemClick", {"idx": idx})
 			}
 		})
